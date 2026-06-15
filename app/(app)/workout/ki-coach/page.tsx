@@ -74,6 +74,15 @@ export default function KICoachPage() {
         body: JSON.stringify({ messages: newMessages }),
       })
       const data = await res.json()
+
+      if (res.status === 429) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⏳ Kurze Pause nötig! Die KI hat gerade viele Anfragen. Bitte warte **30 Sekunden** und schreibe dann nochmal.',
+        }])
+        return
+      }
+
       if (!res.ok) throw new Error(data.error)
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.text }])
@@ -81,7 +90,7 @@ export default function KICoachPage() {
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ Fehler beim Laden. Bitte versuche es erneut oder überprüfe deinen GEMINI_API_KEY.',
+        content: '❌ Verbindungsfehler. Bitte prüfe deine Internetverbindung und versuche es erneut.',
       }])
     } finally {
       setLoading(false)

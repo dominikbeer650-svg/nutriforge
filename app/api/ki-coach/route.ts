@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// gemini-1.5-flash ist stabiler und breiter verfügbar
+// Modelle in Reihenfolge — bei 429 nächstes versuchen
 const GEMINI_MODELS = [
     'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
     'gemini-pro',
 ]
 
@@ -32,7 +32,7 @@ PLAN_JSON_START
   "days": [
     {
       "day_number": 1,
-      "name": "Push Day – Brust/Schultern/Trizeps",
+      "name": "Push Day",
       "focus": "Brust, Schultern, Trizeps",
       "exercises": [
         {
@@ -41,7 +41,7 @@ PLAN_JSON_START
           "sets": 4,
           "reps": "6-8",
           "rest_seconds": 120,
-          "notes": "Schwere Grundübung, progressive Überlastung"
+          "notes": "Schwere Grundübung"
         }
       ]
     }
@@ -49,15 +49,29 @@ PLAN_JSON_START
 }
 PLAN_JSON_END
 
-Nutze echte exercise_ids aus dieser Liste (wichtige IDs):
-Brust: b001(Bankdrücken), b002(Schrägbank), b004(KH-Drücken), b006(Fliegende), b007(Kabelfliegende), b010(Butterfly), b011(Liegestütze), b014(Dips)
-Rücken: r001(Kreuzheben), r003(Klimmzüge), r005(Latzug), r007(Rudern), r009(KH-Rudern), r010(Kabelrudern)
-Schultern: s001(Schulterdrücken), s005(Seitheben), s006(Frontheben), s007(Reverse Fly), s004(Arnold Press)
-Bizeps: bz001(LH-Curl), bz002(KH-Curl), bz003(Hammercurl), bz005(Preacher Curl)
-Trizeps: tz001(Pushdown), tz003(Skull Crusher), tz004(Dips), tz007(Close-Grip BP)
-Beine: l001(Kniebeuge), l004(Beinpresse), l005(Ausfallschritte), l007(Bulgarian), l008(Beinstrecker), l009(Beinbeuger)
-Gesäß: g001(Hip Thrust), g002(Glute Bridge), g004(Cable Kickback)
-Core: c001(Plank), c003(Crunches), c006(Leg Raises), c007(Hanging Leg Raises), c009(Russian Twist)`
+exercise_ids: b001=Bankdrücken, b002=Schrägbank, b004=KH-Drücken, b006=Fliegende, b007=Kabelfly, b010=Butterfly, b011=Liegestütze, b014=Dips, r001=Kreuzheben, r003=Klimmzüge, r005=Latzug, r007=Rudern, r009=KH-Rudern, r010=Kabelrudern, s001=Schulterdrücken, s005=Seitheben, s006=Frontheben, s007=Reverse Fly, s004=Arnold Press, bz001=LH-Curl, bz002=KH-Curl, bz003=Hammercurl, bz005=Preacher Curl, tz001=Pushdown, tz003=Skull Crusher, tz004=Dips, tz007=Close-Grip, l001=Kniebeuge, l004=Beinpresse, l005=Ausfallschritte, l007=Bulgarian, l008=Beinstrecker, l009=Beinbeuger, g001=Hip Thrust, g002=Glute Bridge, c001=Plank, c003=Crunches, c006=Leg Raises, c009=Russian Twist`
+
+// Warte ms Millisekunden
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function callGemini(model: string, contents: unknown[], apiKey: string) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents,
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2048,
+            },
+        }),
+    })
+    return response
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -65,61 +79,59 @@ export async function POST(req: NextRequest) {
         const apiKey = process.env.GEMINI_API_KEY
 
         if (!apiKey) {
-            console.error('GEMINI_API_KEY is not set')
-            return NextResponse.json({ error: 'GEMINI_API_KEY nicht konfiguriert' }, { status: 500 })
+            return NextResponse.json({ error: 'GEMINI_API_KEY nicht gesetzt' }, { status: 500 })
         }
 
-        // Convert messages to Gemini format
         const contents = messages.map((m: { role: string; content: string }) => ({
             role: m.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: m.content }],
         }))
 
-        // Try models in order until one works
-        let lastError = ''
-        for (const model of GEMINI_MODELS) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+        // Jeden Model versuchen, bei 429 kurz warten und nächstes probieren
+        for (let i = 0; i < GEMINI_MODELS.length; i++) {
+            const model = GEMINI_MODELS[i]
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-                    contents,
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 2048,
-                    },
-                }),
-            })
+            // Retry loop pro Model (max 2 Versuche)
+            for (let attempt = 0; attempt < 2; attempt++) {
+                const response = await callGemini(model, contents, apiKey)
 
-            if (!response.ok) {
-                const errBody = await response.json()
-                lastError = errBody.error?.message ?? `HTTP ${response.status}`
-                console.error(`Model ${model} failed:`, lastError)
-                // Try next model
-                continue
+                if (response.status === 429) {
+                    console.log(`429 on ${model} attempt ${attempt + 1}, waiting...`)
+                    // Bei 429: 2 Sekunden warten, dann nächstes Model
+                    await sleep(2000)
+                    break // Nächstes Model probieren
+                }
+
+                if (!response.ok) {
+                    const err = await response.json()
+                    const msg = err.error?.message ?? `HTTP ${response.status}`
+                    console.error(`${model} error:`, msg)
+                    break // Nächstes Model
+                }
+
+                // Erfolg
+                const data = await response.json()
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+
+                let plan = null
+                const jsonMatch = text.match(/PLAN_JSON_START\s*([\s\S]*?)\s*PLAN_JSON_END/)
+                if (jsonMatch) {
+                    try { plan = JSON.parse(jsonMatch[1]) } catch { /* kein Plan */ }
+                }
+
+                const cleanText = text.replace(/PLAN_JSON_START[\s\S]*?PLAN_JSON_END/g, '').trim()
+                console.log(`Success with model: ${model}`)
+                return NextResponse.json({ text: cleanText, plan })
             }
-
-            const data = await response.json()
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
-
-            // Extract plan JSON if present
-            let plan = null
-            const jsonMatch = text.match(/PLAN_JSON_START\s*([\s\S]*?)\s*PLAN_JSON_END/)
-            if (jsonMatch) {
-                try { plan = JSON.parse(jsonMatch[1]) } catch { /* no plan */ }
-            }
-
-            const cleanText = text.replace(/PLAN_JSON_START[\s\S]*?PLAN_JSON_END/g, '').trim()
-            return NextResponse.json({ text: cleanText, plan })
         }
 
-        // All models failed
-        console.error('All Gemini models failed. Last error:', lastError)
+        // Alle Models schlugen fehl
         return NextResponse.json(
-            { error: `Gemini API Fehler: ${lastError}` },
-            { status: 500 }
+            {
+                error: 'Der KI-Coach ist gerade überlastet (Rate Limit). Bitte warte 30 Sekunden und versuche es erneut.',
+                retryable: true,
+            },
+            { status: 429 }
         )
 
     } catch (error) {
