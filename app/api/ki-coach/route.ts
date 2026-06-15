@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+// gemini-1.5-flash ist stabiler und breiter verfügbar
+const GEMINI_MODELS = [
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-pro',
+]
 
 const SYSTEM_PROMPT = `Du bist ein professioneller Personal Trainer und Sportwissenschaftler mit 20 Jahren Erfahrung.
 Du erstellst PERFEKTE, wissenschaftlich fundierte Trainingspläne auf Basis der individuellen Angaben des Nutzers.
@@ -55,61 +60,71 @@ Gesäß: g001(Hip Thrust), g002(Glute Bridge), g004(Cable Kickback)
 Core: c001(Plank), c003(Crunches), c006(Leg Raises), c007(Hanging Leg Raises), c009(Russian Twist)`
 
 export async function POST(req: NextRequest) {
-  try {
-    const { messages } = await req.json()
-    const apiKey = process.env.GEMINI_API_KEY
+    try {
+        const { messages } = await req.json()
+        const apiKey = process.env.GEMINI_API_KEY
 
-    if (!apiKey) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY nicht konfiguriert' }, { status: 500 })
+        if (!apiKey) {
+            console.error('GEMINI_API_KEY is not set')
+            return NextResponse.json({ error: 'GEMINI_API_KEY nicht konfiguriert' }, { status: 500 })
+        }
+
+        // Convert messages to Gemini format
+        const contents = messages.map((m: { role: string; content: string }) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+        }))
+
+        // Try models in order until one works
+        let lastError = ''
+        for (const model of GEMINI_MODELS) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                    contents,
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 2048,
+                    },
+                }),
+            })
+
+            if (!response.ok) {
+                const errBody = await response.json()
+                lastError = errBody.error?.message ?? `HTTP ${response.status}`
+                console.error(`Model ${model} failed:`, lastError)
+                // Try next model
+                continue
+            }
+
+            const data = await response.json()
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+
+            // Extract plan JSON if present
+            let plan = null
+            const jsonMatch = text.match(/PLAN_JSON_START\s*([\s\S]*?)\s*PLAN_JSON_END/)
+            if (jsonMatch) {
+                try { plan = JSON.parse(jsonMatch[1]) } catch { /* no plan */ }
+            }
+
+            const cleanText = text.replace(/PLAN_JSON_START[\s\S]*?PLAN_JSON_END/g, '').trim()
+            return NextResponse.json({ text: cleanText, plan })
+        }
+
+        // All models failed
+        console.error('All Gemini models failed. Last error:', lastError)
+        return NextResponse.json(
+            { error: `Gemini API Fehler: ${lastError}` },
+            { status: 500 }
+        )
+
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unbekannter Fehler'
+        console.error('KI Coach error:', msg)
+        return NextResponse.json({ error: msg }, { status: 500 })
     }
-
-    // Convert messages to Gemini format
-    const contents = messages.map((m: { role: string; content: string }) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }))
-
-    const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-        },
-      }),
-    })
-
-    if (!response.ok) {
-      const err = await response.json()
-      throw new Error(err.error?.message ?? 'Gemini API Fehler')
-    }
-
-    const data = await response.json()
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
-
-    // Extract plan JSON if present
-    let plan = null
-    const jsonMatch = text.match(/PLAN_JSON_START\s*([\s\S]*?)\s*PLAN_JSON_END/)
-    if (jsonMatch) {
-      try {
-        plan = JSON.parse(jsonMatch[1])
-      } catch {
-        // JSON parse failed, no plan
-      }
-    }
-
-    // Clean text (remove JSON block)
-    const cleanText = text.replace(/PLAN_JSON_START[\s\S]*?PLAN_JSON_END/g, '').trim()
-
-    return NextResponse.json({ text: cleanText, plan })
-  } catch (error) {
-    console.error('KI Coach error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unbekannter Fehler' },
-      { status: 500 }
-    )
-  }
 }
