@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Aktuelle Gemini Modelle (Stand Juni 2026)
-// 2.0 Flash wurde März 2026 abgeschaltet!
-const GEMINI_MODELS = [
-    'gemini-2.5-flash-lite-preview-06-17',  // Neuestes, 15 RPM, 1000 RPD
-    'gemini-2.5-flash-preview-05-20',        // 10 RPM, 250 RPD
-    'gemini-2.5-flash',                      // Fallback
-    'gemini-2.5-flash-latest',               // Alias
-]
-
+// Erst alle Modelle dynamisch abfragen, dann das erste funktionierende nehmen
 const SYSTEM_PROMPT = `Du bist ein professioneller Personal Trainer und Sportwissenschaftler mit 20 Jahren Erfahrung.
 Du erstellst PERFEKTE, wissenschaftlich fundierte Trainingspläne auf Basis der individuellen Angaben des Nutzers.
 
@@ -41,7 +33,7 @@ PLAN_JSON_START
           "sets": 4,
           "reps": "6-8",
           "rest_seconds": 120,
-          "notes": "Schwere Grundübung"
+          "notes": "Schwere Grundübung, progressive Überlastung"
         }
       ]
     }
@@ -49,10 +41,39 @@ PLAN_JSON_START
 }
 PLAN_JSON_END
 
-exercise_ids: b001=Bankdrücken, b002=Schrägbank, b004=KH-Drücken, b006=Fliegende, b007=Kabelfly, b010=Butterfly, b011=Liegestütze, b014=Dips, r001=Kreuzheben, r003=Klimmzüge, r005=Latzug, r007=Rudern, r009=KH-Rudern, s001=Schulterdrücken, s005=Seitheben, s006=Frontheben, s007=Reverse Fly, s004=Arnold Press, bz001=LH-Curl, bz002=KH-Curl, bz003=Hammercurl, tz001=Pushdown, tz003=Skull Crusher, tz004=Dips, l001=Kniebeuge, l004=Beinpresse, l005=Ausfallschritte, l007=Bulgarian, l008=Beinstrecker, l009=Beinbeuger, g001=Hip Thrust, g002=Glute Bridge, c001=Plank, c003=Crunches, c006=Leg Raises`
+exercise_ids: b001=Bankdrücken, b002=Schrägbank, b004=KH-Drücken, b006=Fliegende, b007=Kabelfly, b010=Butterfly, b011=Liegestütze, b014=Dips(Brust), r001=Kreuzheben, r003=Klimmzüge, r005=Latzug, r007=Rudern, r009=KH-Rudern, s001=Schulterdrücken, s005=Seitheben, s006=Frontheben, s007=Reverse Fly, s004=Arnold Press, bz001=LH-Curl, bz002=KH-Curl, bz003=Hammercurl, tz001=Pushdown, tz003=Skull Crusher, tz004=Dips(Trizeps), l001=Kniebeuge, l004=Beinpresse, l005=Ausfallschritte, l007=Bulgarian, l008=Beinstrecker, l009=Beinbeuger, g001=Hip Thrust, g002=Glute Bridge, c001=Plank, c003=Crunches, c006=Leg Raises`
 
 function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// Verfügbare Flash-Modelle direkt von der API holen
+async function getAvailableModels(apiKey: string): Promise<string[]> {
+    try {
+        const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=50`,
+            { method: 'GET' }
+        )
+        if (!res.ok) return []
+        const data = await res.json()
+        // Nur generateContent-fähige Flash-Modelle
+        const models: string[] = (data.models ?? [])
+            .filter((m: { name: string; supportedGenerationMethods?: string[] }) =>
+                m.name.includes('flash') &&
+                (m.supportedGenerationMethods ?? []).includes('generateContent')
+            )
+            .map((m: { name: string }) => m.name.replace('models/', ''))
+            // Flash-Lite zuerst (höheres RPM-Limit)
+            .sort((a: string, b: string) => {
+                if (a.includes('lite')) return -1
+                if (b.includes('lite')) return 1
+                return 0
+            })
+        console.log('[ki-coach] Available models:', models)
+        return models
+    } catch {
+        return []
+    }
 }
 
 export async function POST(req: NextRequest) {
@@ -69,10 +90,24 @@ export async function POST(req: NextRequest) {
             parts: [{ text: m.content }],
         }))
 
+        // Modelle dynamisch abrufen
+        const dynamicModels = await getAvailableModels(apiKey)
+
+        // Fallback-Liste falls dynamisch nichts kommt
+        const fallbackModels = [
+            'gemini-2.5-flash-lite',
+            'gemini-2.5-flash',
+            'gemini-1.5-flash-8b',
+            'gemini-1.5-flash',
+        ]
+
+        const modelsToTry = dynamicModels.length > 0 ? dynamicModels : fallbackModels
+        console.log('[ki-coach] Trying models:', modelsToTry)
+
         let lastError = ''
         let lastStatus = 500
 
-        for (const model of GEMINI_MODELS) {
+        for (const model of modelsToTry) {
             try {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
                 const response = await fetch(url, {
@@ -90,8 +125,8 @@ export async function POST(req: NextRequest) {
                 if (!response.ok) {
                     const errBody = await response.json().catch(() => ({}))
                     lastError = errBody.error?.message ?? `HTTP ${response.status}`
-                    console.error(`[ki-coach] ${model} → ${response.status}: ${lastError}`)
-                    if (response.status === 429) await sleep(1500)
+                    console.error(`[ki-coach] ${model} → ${response.status}: ${lastError.slice(0, 100)}`)
+                    if (response.status === 429) await sleep(1000)
                     continue
                 }
 
@@ -101,11 +136,11 @@ export async function POST(req: NextRequest) {
                 let plan = null
                 const jsonMatch = text.match(/PLAN_JSON_START\s*([\s\S]*?)\s*PLAN_JSON_END/)
                 if (jsonMatch) {
-                    try { plan = JSON.parse(jsonMatch[1]) } catch { /* kein Plan im Text */ }
+                    try { plan = JSON.parse(jsonMatch[1]) } catch { /* kein Plan */ }
                 }
 
                 const cleanText = text.replace(/PLAN_JSON_START[\s\S]*?PLAN_JSON_END/g, '').trim()
-                console.log(`[ki-coach] ✓ ${model}`)
+                console.log(`[ki-coach] ✓ Success with: ${model}`)
                 return NextResponse.json({ text: cleanText, plan })
 
             } catch (fetchErr) {
@@ -114,11 +149,12 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        console.error('[ki-coach] All models failed. Last:', lastError, lastStatus)
         return NextResponse.json(
             {
                 error: lastStatus === 429
                     ? 'KI kurz überlastet – bitte 30 Sekunden warten und nochmal senden.'
-                    : `KI Fehler: ${lastError}`,
+                    : `KI Fehler (${lastStatus}): ${lastError}`,
                 retryable: lastStatus === 429,
             },
             { status: lastStatus }
