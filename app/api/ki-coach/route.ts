@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Erst alle Modelle dynamisch abfragen, dann das erste funktionierende nehmen
-const SYSTEM_PROMPT = `Du bist ein professioneller Personal Trainer und Sportwissenschaftler mit 20 Jahren Erfahrung.
-Du erstellst PERFEKTE, wissenschaftlich fundierte Trainingspläne auf Basis der individuellen Angaben des Nutzers.
+const SYSTEM_PROMPT = `Du bist ein professioneller Personal Trainer mit 20 Jahren Erfahrung.
+Du erstellst den PERFEKTEN, individualisierten Trainingsplan.
 
-WICHTIGE REGELN:
+KONVERSATIONSREGELN — SEHR WICHTIG:
+- Stelle IMMER NUR EINE EINZIGE Frage pro Nachricht
+- Warte auf die Antwort, bevor du die nächste Frage stellst
+- Keine Listen mit mehreren Fragen gleichzeitig
+- Kurze, freundliche Nachrichten — max 3 Sätze
 - Antworte IMMER auf Deutsch
-- Stelle gezielte Fragen um den BESTEN Plan zu erstellen
-- Wenn du genug Infos hast, erstelle einen vollständigen Plan im JSON-Format
-- Berücksichtige: Ziel, Erfahrungslevel, verfügbare Zeit, Equipment, Verletzungen, Körpertyp
-- Erkläre WARUM du bestimmte Übungen wählst (kurz)
-- Periodisierung und progressive Überlastung einplanen
 
-PLAN-FORMAT (wenn du alle nötigen Infos hast):
+REIHENFOLGE DER FRAGEN (eine nach der anderen):
+1. Ziel (Muskelaufbau, Abnehmen, Kraft, Ausdauer)
+2. Alter
+3. Körpergewicht (in kg)
+4. Körpergröße (in cm)  
+5. Trainingserfahrung (wie lange schon)
+6. Trainingstage pro Woche (wie viele)
+7. Zeit pro Einheit (wie viele Minuten)
+8. Equipment (Fitnessstudio / Zuhause mit Geräten / Zuhause ohne)
+9. Verletzungen oder Einschränkungen (Knie, Rücken, Schulter etc.)
+10. Körpertyp (schlank und schwer zunehmen = Ektomorph / Schnell Fett ansetzen = Endomorph / Dazwischen = Mesomorph)
+
+Wenn du ALLE 10 Infos gesammelt hast, erstelle den Plan.
+Fasse kurz zusammen was du weißt und erstelle dann den perfekten Plan.
+
+PLAN-FORMAT:
 PLAN_JSON_START
 {
   "name": "Planname",
-  "description": "Kurzbeschreibung",
+  "description": "Kurze Beschreibung warum dieser Plan perfekt für den Nutzer ist",
   "days_per_week": 4,
   "goal": "Muskelaufbau",
   "difficulty": "Fortgeschritten",
@@ -24,7 +37,7 @@ PLAN_JSON_START
   "days": [
     {
       "day_number": 1,
-      "name": "Push Day",
+      "name": "Push Day – Brust/Schultern/Trizeps",
       "focus": "Brust, Schultern, Trizeps",
       "exercises": [
         {
@@ -33,7 +46,7 @@ PLAN_JSON_START
           "sets": 4,
           "reps": "6-8",
           "rest_seconds": 120,
-          "notes": "Schwere Grundübung, progressive Überlastung"
+          "notes": "Schwere Grundübung – progressive Überlastung jede Woche +2.5kg"
         }
       ]
     }
@@ -41,36 +54,39 @@ PLAN_JSON_START
 }
 PLAN_JSON_END
 
-exercise_ids: b001=Bankdrücken, b002=Schrägbank, b004=KH-Drücken, b006=Fliegende, b007=Kabelfly, b010=Butterfly, b011=Liegestütze, b014=Dips(Brust), r001=Kreuzheben, r003=Klimmzüge, r005=Latzug, r007=Rudern, r009=KH-Rudern, s001=Schulterdrücken, s005=Seitheben, s006=Frontheben, s007=Reverse Fly, s004=Arnold Press, bz001=LH-Curl, bz002=KH-Curl, bz003=Hammercurl, tz001=Pushdown, tz003=Skull Crusher, tz004=Dips(Trizeps), l001=Kniebeuge, l004=Beinpresse, l005=Ausfallschritte, l007=Bulgarian, l008=Beinstrecker, l009=Beinbeuger, g001=Hip Thrust, g002=Glute Bridge, c001=Plank, c003=Crunches, c006=Leg Raises`
+exercise_ids:
+Brust: b001=Bankdrücken, b002=Schrägbank LH, b004=KH-Drücken flach, b005=KH-Drücken Schrägbank, b006=Fliegende KH, b007=Kabelfliegende, b010=Butterfly Maschine, b011=Liegestütze, b014=Dips Brust
+Rücken: r001=Kreuzheben, r002=RDL, r003=Klimmzüge, r005=Latzug vorne, r007=LH-Rudern, r009=KH-Rudern einarmig, r010=Kabelrudern, r014=Facepull
+Schultern: s001=LH-Schulterdrücken, s002=KH-Schulterdrücken, s004=Arnold Press, s005=Seitheben KH, s006=Frontheben, s007=Reverse Fly
+Bizeps: bz001=LH-Curl, bz002=KH-Curl, bz003=Hammercurl, bz004=Konzentrationscurl, bz005=Preacher Curl, bz006=Kabel-Curl
+Trizeps: tz001=Seil-Pushdown, tz002=Stangen-Pushdown, tz003=Skull Crusher, tz004=Dips Trizeps, tz005=Overhead Extension KH, tz007=Close-Grip Bankdrücken
+Beine: l001=Kniebeuge, l002=Front Squat, l003=Goblet Squat, l004=Beinpresse, l005=Ausfallschritte, l007=Bulgarian Split Squat, l008=Beinstrecker, l009=Beinbeuger, l010=Sumo Kniebeuge
+Gesäß: g001=Hip Thrust, g002=Glute Bridge, g003=Sumo Deadlift, g004=Cable Kickback
+Core: c001=Plank, c002=Side Plank, c003=Crunches, c005=Bicycle Crunches, c006=Leg Raises, c007=Hanging Leg Raises, c009=Russian Twist, c012=Cable Crunch
+Waden: w001=Wadenheben stehend, w002=Wadenheben sitzend`
 
 function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-// Verfügbare Flash-Modelle direkt von der API holen
 async function getAvailableModels(apiKey: string): Promise<string[]> {
     try {
         const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=50`,
-            { method: 'GET' }
+            `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=50`
         )
         if (!res.ok) return []
         const data = await res.json()
-        // Nur generateContent-fähige Flash-Modelle
-        const models: string[] = (data.models ?? [])
+        return (data.models ?? [])
             .filter((m: { name: string; supportedGenerationMethods?: string[] }) =>
                 m.name.includes('flash') &&
                 (m.supportedGenerationMethods ?? []).includes('generateContent')
             )
             .map((m: { name: string }) => m.name.replace('models/', ''))
-            // Flash-Lite zuerst (höheres RPM-Limit)
             .sort((a: string, b: string) => {
                 if (a.includes('lite')) return -1
                 if (b.includes('lite')) return 1
                 return 0
             })
-        console.log('[ki-coach] Available models:', models)
-        return models
     } catch {
         return []
     }
@@ -90,19 +106,9 @@ export async function POST(req: NextRequest) {
             parts: [{ text: m.content }],
         }))
 
-        // Modelle dynamisch abrufen
         const dynamicModels = await getAvailableModels(apiKey)
-
-        // Fallback-Liste falls dynamisch nichts kommt
-        const fallbackModels = [
-            'gemini-2.5-flash-lite',
-            'gemini-2.5-flash',
-            'gemini-1.5-flash-8b',
-            'gemini-1.5-flash',
-        ]
-
-        const modelsToTry = dynamicModels.length > 0 ? dynamicModels : fallbackModels
-        console.log('[ki-coach] Trying models:', modelsToTry)
+        const fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-flash']
+        const modelsToTry = dynamicModels.length > 0 ? dynamicModels : fallback
 
         let lastError = ''
         let lastStatus = 500
@@ -116,7 +122,7 @@ export async function POST(req: NextRequest) {
                     body: JSON.stringify({
                         system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
                         contents,
-                        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+                        generationConfig: { temperature: 0.7, maxOutputTokens: 3000 },
                     }),
                 })
 
@@ -125,7 +131,7 @@ export async function POST(req: NextRequest) {
                 if (!response.ok) {
                     const errBody = await response.json().catch(() => ({}))
                     lastError = errBody.error?.message ?? `HTTP ${response.status}`
-                    console.error(`[ki-coach] ${model} → ${response.status}: ${lastError.slice(0, 100)}`)
+                    console.error(`[ki-coach] ${model} → ${response.status}: ${lastError.slice(0, 120)}`)
                     if (response.status === 429) await sleep(1000)
                     continue
                 }
@@ -136,27 +142,21 @@ export async function POST(req: NextRequest) {
                 let plan = null
                 const jsonMatch = text.match(/PLAN_JSON_START\s*([\s\S]*?)\s*PLAN_JSON_END/)
                 if (jsonMatch) {
-                    try { plan = JSON.parse(jsonMatch[1]) } catch { /* kein Plan */ }
+                    try { plan = JSON.parse(jsonMatch[1]) } catch { /* kein plan */ }
                 }
 
                 const cleanText = text.replace(/PLAN_JSON_START[\s\S]*?PLAN_JSON_END/g, '').trim()
-                console.log(`[ki-coach] ✓ Success with: ${model}`)
+                console.log(`[ki-coach] ✓ ${model}`)
                 return NextResponse.json({ text: cleanText, plan })
 
             } catch (fetchErr) {
                 lastError = fetchErr instanceof Error ? fetchErr.message : 'Netzwerkfehler'
-                console.error(`[ki-coach] ${model} fetch error:`, lastError)
+                console.error(`[ki-coach] ${model} error:`, lastError)
             }
         }
 
-        console.error('[ki-coach] All models failed. Last:', lastError, lastStatus)
         return NextResponse.json(
-            {
-                error: lastStatus === 429
-                    ? 'KI kurz überlastet – bitte 30 Sekunden warten und nochmal senden.'
-                    : `KI Fehler (${lastStatus}): ${lastError}`,
-                retryable: lastStatus === 429,
-            },
+            { error: lastStatus === 429 ? 'KI kurz überlastet – bitte 30 Sek warten.' : `Fehler: ${lastError}`, retryable: lastStatus === 429 },
             { status: lastStatus }
         )
 
