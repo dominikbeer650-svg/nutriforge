@@ -1,14 +1,17 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Send, Sparkles, Bot, User, CheckCircle, Loader, RefreshCw, AlertCircle, Dumbbell, X } from 'lucide-react'
+import {
+  ArrowLeft, Send, Sparkles, Bot, User, CheckCircle,
+  Loader, RefreshCw, AlertCircle, Dumbbell,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
-  chips?: string[]
+  chips?: string[]   // Chips kommen direkt von der KI
 }
 
 interface GeneratedPlan {
@@ -33,77 +36,16 @@ interface GeneratedPlan {
   }>
 }
 
-// ── Smart chip detection based on KI question content ─────────────────────
-function detectChips(text: string): string[] {
-  const t = text.toLowerCase()
-
-  // Ziel
-  if (t.includes('ziel') || t.includes('was möchtest du erreichen') || t.includes('hauptziel')) {
-    return ['💪 Muskelaufbau', '🔥 Gewicht verlieren', '⚡ Kraft steigern', '🏃 Ausdauer', '🎯 Allgemeine Fitness']
-  }
-  // Alter
-  if (t.includes('alter') || t.includes('wie alt') || t.includes('jahre alt')) {
-    return ['Unter 18', '18–24 Jahre', '25–34 Jahre', '35–44 Jahre', '45–54 Jahre', '55+ Jahre']
-  }
-  // Gewicht
-  if ((t.includes('gewicht') || t.includes('kg') || t.includes('wiegst')) && !t.includes('trainingsgewicht')) {
-    return ['Unter 60 kg', '60–70 kg', '70–80 kg', '80–90 kg', '90–100 kg', 'Über 100 kg']
-  }
-  // Größe
-  if (t.includes('größe') || t.includes('cm') || t.includes('groß bist') || t.includes('körpergröße')) {
-    return ['Unter 160 cm', '160–170 cm', '170–180 cm', '180–190 cm', '190–200 cm', 'Über 200 cm']
-  }
-  // Erfahrung
-  if (t.includes('erfahrung') || t.includes('wie lange') || t.includes('trainierst du') || t.includes('anfänger')) {
-    return ['🆕 Anfänger (< 6 Monate)', '📈 1 Jahr', '💪 2–3 Jahre', '🏆 3–5 Jahre', '⭐ 5+ Jahre']
-  }
-  // Trainingstage
-  if (t.includes('tage') || t.includes('wie oft') || t.includes('pro woche') || t.includes('wochentage') || t.includes('trainingstage')) {
-    return ['2x pro Woche', '3x pro Woche', '4x pro Woche', '5x pro Woche', '6x pro Woche']
-  }
-  // Zeit pro Einheit
-  if (t.includes('zeit') || t.includes('minuten') || t.includes('wie lange dauert') || t.includes('pro einheit') || t.includes('dauer')) {
-    return ['30 Min', '45 Min', '60 Min', '75 Min', '90+ Min']
-  }
-  // Equipment
-  if (t.includes('equipment') || t.includes('ausrüstung') || t.includes('gym') || t.includes('fitnessstudio') || t.includes('geräte') || t.includes('trainierst du in')) {
-    return ['🏋️ Fitnessstudio (alles vorhanden)', '🏠 Zuhause mit Kurzhanteln', '🏠 Zuhause ohne Geräte', '🏋️ Gym + manchmal Zuhause']
-  }
-  // Verletzungen
-  if (t.includes('verletzung') || t.includes('einschränkung') || t.includes('beschwerden') || t.includes('knie') || t.includes('rücken') || t.includes('schulter')) {
-    return ['✅ Keine Verletzungen', '⚠️ Knieprobleme', '⚠️ Rückenschmerzen', '⚠️ Schulterprobleme', '⚠️ Mehrere Einschränkungen']
-  }
-  // Körpertyp
-  if (t.includes('körpertyp') || t.includes('ektomorph') || t.includes('endomorph') || t.includes('mesomorph') || t.includes('stoffwechsel') || t.includes('schwer zunehmen') || t.includes('fett ansetzen')) {
-    return ['🦴 Ektomorph (schwer zuzunehmen)', '⚖️ Mesomorph (dazwischen)', '🔵 Endomorph (schnell Fett)']
-  }
-  // Plan anpassen
-  if (t.includes('plan') && (t.includes('erstellt') || t.includes('hier ist') || t.includes('dein plan') || t.includes('folgende plan'))) {
-    return ['✅ Perfekt, speichern!', '📅 Mehr Trainingstage', '📅 Weniger Trainingstage', '💪 Mehr Volumen', '⏱️ Kürzere Einheiten']
-  }
-  // Ja/Nein Fragen
-  if (t.includes('möchtest du') || t.includes('hast du') || t.includes('trainierst du') || t.includes('bist du') || t.includes('gibt es')) {
-    return ['✅ Ja', '❌ Nein', '🤔 Manchmal / Teilweise']
-  }
-  return []
-}
-
-// ── Progress tracker ──────────────────────────────────────────────────────
-const STEPS = ['Ziel', 'Alter', 'Gewicht', 'Größe', 'Erfahrung', 'Tage', 'Zeit', 'Equipment', 'Verletzungen', 'Körpertyp']
-
-function getProgress(messages: Message[]): number {
-  const userMsgs = messages.filter(m => m.role === 'user').length
-  return Math.min(userMsgs, STEPS.length)
+const INITIAL_MESSAGE: Message = {
+  role: 'assistant',
+  content: 'Hey! Ich bin dein persönlicher KI-Trainer 💪\n\nIch stelle dir ein paar Fragen um deinen **perfekten** Trainingsplan zu erstellen. Fangen wir an:\n\n**Was ist dein Hauptziel?**',
+  chips: ['💪 Muskelaufbau', '🔥 Gewicht verlieren', '⚡ Kraft steigern', '🏃 Ausdauer verbessern', '🎯 Fit & gesund bleiben'],
 }
 
 export default function KICoachPage() {
   const router = useRouter()
   const { user } = useAuthStore()
-  const [messages, setMessages] = useState<Message[]>([{
-    role: 'assistant',
-    content: 'Hey! Ich bin dein KI-Trainer 💪 Ich stelle dir jetzt ein paar kurze Fragen, um dir den perfekten Trainingsplan zu erstellen.\n\nFangen wir an: **Was ist dein Hauptziel?**',
-    chips: ['💪 Muskelaufbau', '🔥 Gewicht verlieren', '⚡ Kraft steigern', '🏃 Ausdauer', '🎯 Allgemeine Fitness'],
-  }])
+  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null)
@@ -111,7 +53,6 @@ export default function KICoachPage() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
@@ -131,6 +72,7 @@ export default function KICoachPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Only send role + content to the API, not chips
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
         }),
       })
@@ -139,7 +81,7 @@ export default function KICoachPage() {
       if (res.status === 429) {
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: '⏳ Kurze Pause — bitte warte **30 Sekunden** und schreibe dann nochmal.',
+          content: '⏳ Kurz Pause nötig — bitte warte **30 Sekunden** und schreib dann nochmal.',
           chips: ['🔄 Nochmal versuchen'],
         }])
         setLoading(false)
@@ -148,14 +90,20 @@ export default function KICoachPage() {
 
       if (!res.ok) throw new Error(data.error ?? 'Fehler')
 
-      const chips = detectChips(data.text)
-      setMessages(prev => [...prev, { role: 'assistant', content: data.text, chips }])
+      // Chips kommen direkt von der KI — kein Pattern-Matching mehr
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content: data.text,
+        chips: Array.isArray(data.chips) ? data.chips : [],
+      }
+      setMessages(prev => [...prev, assistantMsg])
+
       if (data.plan) setGeneratedPlan(data.plan)
 
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `❌ ${err instanceof Error ? err.message : 'Verbindungsfehler'} – bitte nochmal versuchen.`,
+        content: `❌ ${err instanceof Error ? err.message : 'Verbindungsfehler'} — bitte nochmal versuchen.`,
         chips: ['🔄 Erneut versuchen'],
       }])
     } finally {
@@ -189,8 +137,15 @@ export default function KICoachPage() {
       for (const day of generatedPlan.days) {
         const { data: planDay, error: dayError } = await supabase
           .from('workout_plan_days')
-          .insert({ plan_id: plan.id, day_number: day.day_number, name: day.name, focus: day.focus ?? '' })
-          .select('id').single()
+          .insert({
+            plan_id: plan.id,
+            day_number: day.day_number,
+            name: day.name,
+            focus: day.focus ?? '',
+          })
+          .select('id')
+          .single()
+
         if (dayError) throw new Error(dayError.message)
         if (!planDay?.id) continue
 
@@ -204,11 +159,15 @@ export default function KICoachPage() {
           notes: ex.notes ?? '',
           sort_order: i,
         }))
+
         if (inserts.length > 0) {
-          const { error: exError } = await supabase.from('workout_plan_exercises').insert(inserts)
+          const { error: exError } = await supabase
+            .from('workout_plan_exercises')
+            .insert(inserts)
           if (exError) throw new Error(exError.message)
         }
       }
+
       setSaved(true)
       setTimeout(() => router.push('/workout'), 1800)
     } catch (err) {
@@ -218,110 +177,87 @@ export default function KICoachPage() {
     }
   }
 
-  function formatText(text: string) {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n\n/g, '<br/><br/>')
-      .replace(/\n/g, '<br/>')
-  }
-
-  const progress = getProgress(messages)
   const lastMsg = messages[messages.length - 1]
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#F7F8FA' }}>
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div style={{
         padding: '52px 16px 14px',
-        background: 'white', borderBottom: '1px solid #E8EAED',
+        background: 'white',
+        borderBottom: '1px solid #E8EAED',
         flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 12,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}>
-            <ArrowLeft size={22} color="#111827" />
-          </button>
-          <div style={{ width: 38, height: 38, borderRadius: 11, background: '#2DC96E', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(45,201,110,0.3)' }}>
-            <Sparkles size={19} color="white" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontWeight: 800, fontSize: 16, color: '#111827' }}>KI-Coach</p>
-            <p style={{ fontSize: 12, color: '#9CA3AF' }}>Powered by Gemini · Kostenlos</p>
-          </div>
-          <button onClick={() => { setMessages([messages[0]]); setGeneratedPlan(null); setSaved(false); setSaveError(null) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9CA3AF' }} title="Neu starten">
-            <RefreshCw size={17} />
-          </button>
+        <button
+          onClick={() => router.back()}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
+        >
+          <ArrowLeft size={22} color="#111827" />
+        </button>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12, background: '#2DC96E',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 2px 8px rgba(45,201,110,0.35)',
+        }}>
+          <Sparkles size={20} color="white" />
         </div>
-
-        {/* Progress bar */}
-        {!generatedPlan && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Fortschritt
-              </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#2DC96E' }}>
-                {progress}/{STEPS.length}
-              </span>
-            </div>
-            <div style={{ height: 5, background: '#F1F3F6', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%', borderRadius: 3,
-                background: 'linear-gradient(90deg, #2DC96E, #22A85A)',
-                width: `${(progress / STEPS.length) * 100}%`,
-                transition: 'width 0.5s ease',
-              }} />
-            </div>
-            <div style={{ display: 'flex', gap: 0, marginTop: 6, overflowX: 'auto' }} className="no-scrollbar">
-              {STEPS.map((step, i) => (
-                <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    width: 7, height: 7, borderRadius: '50%',
-                    background: i < progress ? '#2DC96E' : '#E8EAED',
-                    transition: 'background 0.3s',
-                  }} />
-                  <span style={{ fontSize: 9, color: i < progress ? '#2DC96E' : '#D1D5DB', marginTop: 3, whiteSpace: 'nowrap', fontWeight: i < progress ? 700 : 400 }}>
-                    {step}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <div style={{ flex: 1 }}>
+          <p style={{ fontWeight: 800, fontSize: 16, color: '#111827' }}>KI-Coach</p>
+          <p style={{ fontSize: 12, color: '#9CA3AF' }}>Powered by Gemini · Kostenlos</p>
+        </div>
+        <button
+          onClick={() => {
+            setMessages([INITIAL_MESSAGE])
+            setGeneratedPlan(null)
+            setSaved(false)
+            setSaveError(null)
+          }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#9CA3AF' }}
+          title="Neu starten"
+        >
+          <RefreshCw size={17} />
+        </button>
       </div>
 
-      {/* Messages */}
+      {/* ── Messages ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px' }}>
+
         {messages.map((msg, i) => {
           const isLast = i === messages.length - 1
+          const showChips = isLast && msg.role === 'assistant' && !loading && !saved && (msg.chips ?? []).length > 0
+
           return (
-            <div key={i}>
-              {/* Message bubble */}
+            <div key={i} style={{ marginBottom: 4 }}>
+              {/* Bubble */}
               <div style={{
                 display: 'flex', gap: 10,
-                marginBottom: 4,
                 flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
                 alignItems: 'flex-end',
+                marginBottom: showChips ? 8 : 14,
               }}>
+                {/* Avatar */}
                 <div style={{
-                  width: 30, height: 30, borderRadius: 9, flexShrink: 0, marginBottom: 2,
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
                   background: msg.role === 'assistant' ? '#2DC96E' : '#F1F3F6',
+                  border: `1px solid ${msg.role === 'assistant' ? '#22A85A' : '#E8EAED'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid ' + (msg.role === 'assistant' ? '#22A85A' : '#E8EAED'),
+                  marginBottom: 2,
                 }}>
                   {msg.role === 'assistant'
-                    ? <Bot size={14} color="white" />
-                    : <User size={14} color="#6B7280" />}
+                    ? <Bot size={15} color="white" />
+                    : <User size={15} color="#6B7280" />}
                 </div>
+
+                {/* Text */}
                 <div style={{
-                  maxWidth: '78%',
-                  padding: '11px 14px',
-                  borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                  maxWidth: '80%',
+                  padding: '12px 15px',
+                  borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                   background: msg.role === 'user' ? '#2DC96E' : 'white',
                   border: msg.role === 'assistant' ? '1px solid #E8EAED' : 'none',
-                  fontSize: 14, lineHeight: 1.65,
+                  fontSize: 15, lineHeight: 1.6,
                   color: msg.role === 'user' ? 'white' : '#111827',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                 }}>
@@ -333,30 +269,38 @@ export default function KICoachPage() {
                 </div>
               </div>
 
-              {/* Chips — only under last assistant message, when not loading */}
-              {isLast && msg.role === 'assistant' && (msg.chips ?? []).length > 0 && !loading && !saved && (
+              {/* ── Chips — directly from KI, no pattern matching ── */}
+              {showChips && (
                 <div style={{
                   display: 'flex', gap: 8, flexWrap: 'wrap',
-                  marginLeft: 40, marginTop: 6, marginBottom: 10,
+                  marginLeft: 42, marginBottom: 14,
                 }}>
                   {msg.chips!.map(chip => (
                     <button
                       key={chip}
                       onClick={() => sendMessage(chip)}
                       style={{
-                        padding: '8px 14px',
-                        borderRadius: 20,
+                        padding: '9px 16px',
+                        borderRadius: 22,
                         border: '1.5px solid #2DC96E',
-                        background: '#F0FDF4',
+                        background: 'white',
                         color: '#15803D',
-                        fontSize: 13, fontWeight: 600,
+                        fontSize: 14, fontWeight: 600,
                         cursor: 'pointer',
                         transition: 'all 0.15s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                         whiteSpace: 'nowrap',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                       }}
-                      onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = '#2DC96E'; (e.target as HTMLButtonElement).style.color = 'white' }}
-                      onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = '#F0FDF4'; (e.target as HTMLButtonElement).style.color = '#15803D' }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget
+                        el.style.background = '#2DC96E'
+                        el.style.color = 'white'
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget
+                        el.style.background = 'white'
+                        el.style.color = '#15803D'
+                      }}
                     >
                       {chip}
                     </button>
@@ -369,56 +313,102 @@ export default function KICoachPage() {
 
         {/* Loading dots */}
         {loading && (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 12 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 9, background: '#2DC96E', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #22A85A' }}>
-              <Bot size={14} color="white" />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 14 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: '#2DC96E', border: '1px solid #22A85A',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Bot size={15} color="white" />
             </div>
-            <div style={{ padding: '12px 16px', borderRadius: '16px 16px 16px 4px', background: 'white', border: '1px solid #E8EAED', display: 'flex', gap: 5 }}>
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: '18px 18px 18px 4px',
+              background: 'white', border: '1px solid #E8EAED',
+              display: 'flex', gap: 5, alignItems: 'center',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
               {[0, 1, 2].map(i => (
-                <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#2DC96E', animation: 'bounce 1.2s ease-in-out infinite', animationDelay: `${i * 0.2}s` }} />
+                <div key={i} style={{
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: '#2DC96E',
+                  animation: 'bounce 1.2s ease-in-out infinite',
+                  animationDelay: `${i * 0.2}s`,
+                }} />
               ))}
             </div>
           </div>
         )}
 
-        {/* Generated Plan */}
+        {/* ── Generated Plan Card ── */}
         {generatedPlan && !saved && (
-          <div style={{ margin: '8px 0 16px', borderRadius: 16, background: 'white', border: '1.5px solid #2DC96E', overflow: 'hidden', boxShadow: '0 4px 16px rgba(45,201,110,0.15)' }}>
-            {/* Header */}
-            <div style={{ padding: '16px 18px 14px', background: 'linear-gradient(135deg, #F0FDF4, #DCFCE7)', borderBottom: '1px solid #BBF7D0' }}>
+          <div style={{
+            margin: '4px 0 16px',
+            borderRadius: 18,
+            background: 'white',
+            border: '1.5px solid #2DC96E',
+            overflow: 'hidden',
+            boxShadow: '0 4px 20px rgba(45,201,110,0.15)',
+          }}>
+            {/* Plan header */}
+            <div style={{
+              padding: '18px 18px 14px',
+              background: 'linear-gradient(135deg, #F0FDF4, #DCFCE7)',
+              borderBottom: '1px solid #BBF7D0',
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <CheckCircle size={18} color="#2DC96E" />
-                <p style={{ fontWeight: 700, fontSize: 12, color: '#15803D', textTransform: 'uppercase', letterSpacing: 0.8 }}>Dein Plan ist fertig! 🎉</p>
+                <p style={{ fontWeight: 700, fontSize: 12, color: '#15803D', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  Dein Plan ist fertig 🎉
+                </p>
               </div>
-              <p style={{ fontWeight: 800, fontSize: 18, color: '#111827', letterSpacing: '-0.02em', marginBottom: 4 }}>{generatedPlan.name}</p>
-              <p style={{ fontSize: 13, color: '#4B5563', lineHeight: 1.5 }}>{generatedPlan.description}</p>
+              <p style={{ fontWeight: 800, fontSize: 19, color: '#111827', letterSpacing: '-0.03em', marginBottom: 6 }}>
+                {generatedPlan.name}
+              </p>
+              <p style={{ fontSize: 14, color: '#4B5563', lineHeight: 1.55 }}>
+                {generatedPlan.description}
+              </p>
             </div>
 
             {/* Tags */}
             <div style={{ padding: '12px 18px', display: 'flex', gap: 8, flexWrap: 'wrap', borderBottom: '1px solid #F1F3F6' }}>
               {[
                 `🎯 ${generatedPlan.goal}`,
-                `📅 ${generatedPlan.days_per_week}x/Woche`,
+                `📅 ${generatedPlan.days_per_week}×/Woche`,
                 `⏱ ${generatedPlan.duration_weeks} Wochen`,
                 `💪 ${generatedPlan.difficulty}`,
               ].map(tag => (
-                <span key={tag} style={{ padding: '4px 10px', borderRadius: 20, background: '#F7F8FA', border: '1px solid #E8EAED', fontSize: 12, fontWeight: 600, color: '#374151' }}>
+                <span key={tag} style={{
+                  padding: '5px 11px', borderRadius: 20,
+                  background: '#F7F8FA', border: '1px solid #E8EAED',
+                  fontSize: 12, fontWeight: 600, color: '#374151',
+                }}>
                   {tag}
                 </span>
               ))}
             </div>
 
-            {/* Days */}
+            {/* Days preview */}
             <div>
               {generatedPlan.days.map((day, i) => (
-                <div key={i} style={{ padding: '12px 18px', borderBottom: i < generatedPlan.days.length - 1 ? '1px solid #F1F3F6' : 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 30, height: 30, borderRadius: 8, background: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div key={i} style={{
+                  padding: '13px 18px',
+                  borderBottom: i < generatedPlan.days.length - 1 ? '1px solid #F1F3F6' : 'none',
+                  display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    background: '#F0FDF4', border: '1px solid #BBF7D0',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
                     <span style={{ fontSize: 12, fontWeight: 800, color: '#2DC96E' }}>{day.day_number}</span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 700, fontSize: 13, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{day.name}</p>
-                    <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>
-                      {day.exercises.length} Übungen · {day.exercises.slice(0, 2).map(e => e.exercise_name).join(', ')}{day.exercises.length > 2 ? '...' : ''}
+                    <p style={{ fontWeight: 700, fontSize: 14, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {day.name}
+                    </p>
+                    <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+                      {day.exercises.length} Übungen · {day.exercises.slice(0, 2).map(e => e.exercise_name).join(', ')}{day.exercises.length > 2 ? ' ...' : ''}
                     </p>
                   </div>
                   <Dumbbell size={14} color="#D1D5DB" />
@@ -432,7 +422,7 @@ export default function KICoachPage() {
                 <AlertCircle size={16} color="#EF4444" style={{ flexShrink: 0, marginTop: 1 }} />
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: '#DC2626' }}>Speichern fehlgeschlagen</p>
-                  <p style={{ fontSize: 12, color: '#EF4444', marginTop: 2 }}>{saveError}</p>
+                  <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{saveError}</p>
                   <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>Stelle sicher dass supabase-phase2.sql ausgeführt wurde.</p>
                 </div>
               </div>
@@ -442,7 +432,11 @@ export default function KICoachPage() {
             <div style={{ padding: '14px 16px 18px', display: 'flex', gap: 10 }}>
               <button
                 onClick={() => sendMessage('Bitte pass den Plan etwas an')}
-                style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid #E8EAED', background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#6B7280' }}
+                style={{
+                  flex: 1, padding: '13px', borderRadius: 13,
+                  border: '1.5px solid #E8EAED', background: 'white',
+                  cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#6B7280',
+                }}
               >
                 🔄 Anpassen
               </button>
@@ -450,39 +444,39 @@ export default function KICoachPage() {
                 className="btn-primary"
                 onClick={savePlan}
                 disabled={saving}
-                style={{ flex: 2, borderRadius: 12, padding: '12px', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                style={{ flex: 2, borderRadius: 13, padding: '13px', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
                 {saving
-                  ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Speichern...</>
+                  ? <><Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Speichern...</>
                   : '✅ Plan speichern'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Saved */}
+        {/* Saved confirmation */}
         {saved && (
-          <div style={{ margin: '8px 0 16px', padding: '24px', borderRadius: 16, background: 'linear-gradient(135deg, #F0FDF4, #DCFCE7)', border: '1px solid #BBF7D0', textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 10 }}>🎉</div>
-            <p style={{ fontWeight: 800, fontSize: 18, color: '#111827', marginBottom: 4 }}>Plan gespeichert!</p>
-            <p style={{ fontSize: 14, color: '#4B5563' }}>Du wirst weitergeleitet...</p>
+          <div style={{ margin: '4px 0 16px', padding: '28px 24px', borderRadius: 18, background: 'linear-gradient(135deg, #F0FDF4, #DCFCE7)', border: '1px solid #BBF7D0', textAlign: 'center' }}>
+            <div style={{ fontSize: 44, marginBottom: 12 }}>🎉</div>
+            <p style={{ fontWeight: 800, fontSize: 19, color: '#111827', marginBottom: 6 }}>Plan gespeichert!</p>
+            <p style={{ fontSize: 14, color: '#4B5563' }}>Du wirst zu deinen Trainingsplänen weitergeleitet...</p>
           </div>
         )}
 
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div style={{
-        padding: '10px 16px',
-        paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
-        background: 'white', borderTop: '1px solid #E8EAED',
-        flexShrink: 0,
-      }}>
-        {!saved && (
+      {/* ── Input ── */}
+      {!saved && (
+        <div style={{
+          padding: '10px 16px',
+          paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+          background: 'white',
+          borderTop: '1px solid #E8EAED',
+          flexShrink: 0,
+        }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
-              ref={inputRef}
               className="input"
               placeholder="Oder eigene Antwort eingeben..."
               value={input}
@@ -495,22 +489,29 @@ export default function KICoachPage() {
               onClick={() => sendMessage()}
               disabled={loading || !input.trim()}
               style={{
-                width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                width: 46, height: 46, borderRadius: 13, flexShrink: 0,
                 background: input.trim() && !loading ? '#2DC96E' : '#F1F3F6',
-                border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'default',
+                border: 'none',
+                cursor: input.trim() && !loading ? 'pointer' : 'default',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'background 0.2s',
               }}
             >
-              <Send size={17} color={input.trim() && !loading ? 'white' : '#9CA3AF'} />
+              <Send size={18} color={input.trim() && !loading ? 'white' : '#9CA3AF'} />
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <style>{`
-        @keyframes bounce { 0%,100%{transform:translateY(0);opacity:.4} 50%{transform:translateY(-5px);opacity:1} }
-        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); opacity: 0.4; }
+          50% { transform: translateY(-5px); opacity: 1; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
       `}</style>
     </div>
   )
