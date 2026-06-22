@@ -256,14 +256,14 @@ export default function WorkoutPage() {
         <button onClick={() => router.push('/workout/ki-coach')} className="banner" style={{ width: '100%', marginBottom: 14, border: 'none', cursor: 'pointer' }}>
           <div className="banner-icon"><Sparkles size={22} color="white" /></div>
           <div style={{ flex: 1, textAlign: 'left' }}>
-            <p style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>KI-Coach</p>
-            <p style={{ fontSize: 13, color: '#4B5563', marginTop: 1 }}>Perfekten Trainingsplan erstellen lassen</p>
+            <p style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)' }}>KI-Coach</p>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 1 }}>Perfekten Trainingsplan erstellen lassen</p>
           </div>
           <ChevronRight size={18} color="#9CA3AF" />
         </button>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', background: '#F1F3F6', borderRadius: 12, padding: 4, gap: 2, marginBottom: 16 }}>
+        <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 12, padding: 4, gap: 2, marginBottom: 16 }}>
           {(['routines', 'plans', 'exercises'] as Tab[]).map(t => {
             const labels: Record<Tab, string> = { routines: 'Routinen', plans: 'KI-Pläne', exercises: 'Übungen' }
             return (
@@ -289,20 +289,20 @@ export default function WorkoutPage() {
                 <p style={{ fontWeight: 700, fontSize: 14, color: 'white' }}>Freies Training</p>
                 <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>Ohne Vorlage starten</p>
               </button>
-              <button onClick={() => setShowRoutineBuilder(true)} style={{ padding: '16px', borderRadius: 14, background: 'white', border: '1.5px dashed #D1D5DB', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+              <button onClick={() => setShowRoutineBuilder(true)} style={{ padding: '16px', borderRadius: 14, background: 'var(--surface)', border: '1.5px dashed #D1D5DB', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Plus size={18} color="#2DC96E" />
                 </div>
-                <p style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>Neue Routine</p>
-                <p style={{ fontSize: 11, color: '#9CA3AF' }}>Vorlage erstellen</p>
+                <p style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>Neue Routine</p>
+                <p style={{ fontSize: 11, color: 'var(--text-3)' }}>Vorlage erstellen</p>
               </button>
             </div>
 
             {routines.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', background: 'white', borderRadius: 16, border: '1px solid #E8EAED' }}>
+              <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>💪</div>
                 <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Noch keine Routinen</p>
-                <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 16 }}>Erstelle eine Vorlage oder nutze den KI-Coach.</p>
+                <p style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 16 }}>Erstelle eine Vorlage oder nutze den KI-Coach.</p>
                 <button className="btn-primary" onClick={() => setShowRoutineBuilder(true)} style={{ width: 'auto', display: 'inline-flex', margin: '0 auto' }}>
                   <Plus size={16} /> Routine erstellen
                 </button>
@@ -311,7 +311,7 @@ export default function WorkoutPage() {
               routines.map(routine => {
                 const muscleSet = [...new Set(routine.exercises.map(e => e.muscle))].slice(0, 4)
                 return (
-                  <div key={routine.id} style={{ background: 'white', borderRadius: 16, border: '1px solid #E8EAED', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                  <div key={routine.id} style={{ background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
                     <div style={{ padding: '16px' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
                         <div style={{ flex: 1 }}>
@@ -323,10 +323,10 @@ export default function WorkoutPage() {
                             })}
                           </div>
                           <div style={{ display: 'flex', gap: 12 }}>
-                            <span style={{ fontSize: 12, color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3 }}>
                               <Dumbbell size={12} /> {routine.exercises.length} Übungen
                             </span>
-                            <span style={{ fontSize: 12, color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3 }}>
                               <Clock size={12} /> {formatLastUsed(routine.lastUsed)}
                             </span>
                           </div>
@@ -341,13 +341,13 @@ export default function WorkoutPage() {
                           return (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                              <span style={{ fontSize: 13, color: '#4B5563', flex: 1 }}>{ex.exerciseName}</span>
-                              <span style={{ fontSize: 11, color: '#9CA3AF' }}>{ex.defaultSets}×{ex.defaultReps}</span>
+                              <span style={{ fontSize: 13, color: 'var(--text-2)', flex: 1 }}>{ex.exerciseName}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{ex.defaultSets}×{ex.defaultReps}</span>
                             </div>
                           )
                         })}
                         {routine.exercises.length > 4 && (
-                          <p style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 14 }}>+{routine.exercises.length - 4} weitere</p>
+                          <p style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 14 }}>+{routine.exercises.length - 4} weitere</p>
                         )}
                       </div>
                       <button onClick={() => startRoutine(routine)} className="btn-primary">
@@ -364,13 +364,13 @@ export default function WorkoutPage() {
         {/* ── KI PLÄNE ── */}
         {tab === 'plans' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {plansLoading && <p style={{ textAlign: 'center', color: '#9CA3AF', padding: '32px 0' }}>Laden...</p>}
+            {plansLoading && <p style={{ textAlign: 'center', color: 'var(--text-3)', padding: '32px 0' }}>Laden...</p>}
 
             {!plansLoading && plans.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '48px 20px', background: 'white', borderRadius: 16, border: '1px solid #E8EAED' }}>
+              <div style={{ textAlign: 'center', padding: '48px 20px', background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)' }}>
                 <Sparkles size={44} style={{ color: '#2DC96E', margin: '0 auto 12px', display: 'block', opacity: 0.5 }} />
                 <p style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Noch keine KI-Pläne</p>
-                <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 20 }}>Lass dir deinen perfekten Plan erstellen!</p>
+                <p style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 20 }}>Lass dir deinen perfekten Plan erstellen!</p>
                 <button className="btn-primary" onClick={() => router.push('/workout/ki-coach')} style={{ width: 'auto', margin: '0 auto', display: 'inline-flex', gap: 8 }}>
                   <Sparkles size={16} /> KI-Coach starten
                 </button>
@@ -383,7 +383,7 @@ export default function WorkoutPage() {
               const totalEx = days.reduce((sum, d) => sum + (d.workout_plan_exercises?.length ?? 0), 0)
 
               return (
-                <div key={plan.id} style={{ background: 'white', borderRadius: 16, border: '1px solid #E8EAED', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <div key={plan.id} style={{ background: 'var(--surface)', borderRadius: 16, border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow)', cursor: 'pointer' }} onClick={() => router.push(`/workout/plan/${plan.id}`)}>
                   {/* Plan header */}
                   <div style={{ padding: '18px 18px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -392,12 +392,12 @@ export default function WorkoutPage() {
                           <p style={{ fontWeight: 700, fontSize: 16 }}>{plan.name}</p>
                           {plan.is_ai_generated && <span style={{ padding: '2px 7px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: '#F0FDF4', color: '#15803D', border: '1px solid #BBF7D0' }}>✨ KI</span>}
                         </div>
-                        <p style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.5, marginBottom: 10 }}>{plan.description}</p>
+                        <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 10 }}>{plan.description}</p>
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {plan.days_per_week}×/Woche</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={12} /> {plan.days_per_week}×/Woche</span>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `${DIFF_COLOR[plan.difficulty] ?? '#6B7280'}15`, color: DIFF_COLOR[plan.difficulty] ?? '#6B7280' }}>{plan.difficulty}</span>
-                          {plan.goal && <span style={{ fontSize: 12, color: '#9CA3AF' }}>🎯 {plan.goal}</span>}
-                          <span style={{ fontSize: 12, color: '#9CA3AF' }}>💪 {totalEx} Übungen</span>
+                          {plan.goal && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>🎯 {plan.goal}</span>}
+                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>💪 {totalEx} Übungen</span>
                         </div>
                       </div>
                       <button onClick={() => setDeletePlan(plan)} style={{ width: 34, height: 34, borderRadius: 9, background: '#FEF2F2', border: '1px solid #FECACA', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -409,9 +409,9 @@ export default function WorkoutPage() {
                   {/* Days — expandable */}
                   <button
                     onClick={() => setExpandedPlan(isExpanded ? null : plan.id)}
-                    style={{ width: '100%', padding: '10px 18px', background: '#F7F8FA', border: 'none', borderTop: '1px solid #E8EAED', borderBottom: isExpanded ? '1px solid #E8EAED' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                    style={{ width: '100%', padding: '10px 18px', background: 'var(--bg)', border: 'none', borderTop: '1px solid #E8EAED', borderBottom: isExpanded ? '1px solid #E8EAED' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   >
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#4B5563' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>
                       {days.length} Trainingstage {isExpanded ? 'ausblenden' : 'anzeigen'}
                     </span>
                     {isExpanded ? <ChevronUp size={16} color="#9CA3AF" /> : <ChevronDown size={16} color="#9CA3AF" />}
@@ -424,8 +424,8 @@ export default function WorkoutPage() {
                           {/* Day header */}
                           <div style={{ padding: '12px 18px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div>
-                              <p style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>Tag {day.day_number}: {day.name}</p>
-                              <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>{day.focus} · {day.workout_plan_exercises?.length ?? 0} Übungen</p>
+                              <p style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>Tag {day.day_number}: {day.name}</p>
+                              <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{day.focus} · {day.workout_plan_exercises?.length ?? 0} Übungen</p>
                             </div>
                             <button
                               onClick={() => startFromPlanDay(plan, day)}
@@ -442,10 +442,10 @@ export default function WorkoutPage() {
                               <div key={ex.id} style={{ padding: '8px 18px 8px 18px', display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid #F7F8FA' }}>
                                 <div style={{ width: 4, height: 28, borderRadius: 2, background: color, flexShrink: 0 }} />
                                 <div style={{ flex: 1 }}>
-                                  <p style={{ fontWeight: 600, fontSize: 13, color: '#111827' }}>{ex.exercise_name}</p>
-                                  {ex.notes && <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1, fontStyle: 'italic' }}>{ex.notes}</p>}
+                                  <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-1)' }}>{ex.exercise_name}</p>
+                                  {ex.notes && <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1, fontStyle: 'italic' }}>{ex.notes}</p>}
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: '#4B5563', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                                   {ex.sets}×{ex.reps_range}
                                 </span>
                               </div>
@@ -473,7 +473,7 @@ export default function WorkoutPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <div style={{ flex: 1, position: 'relative' }}>
-                <Search size={16} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', pointerEvents: 'none' }} />
+                <Search size={16} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} />
                 <input className="input" placeholder="Übung suchen..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 40 }} />
               </div>
               <button onClick={() => setShowFilters(!showFilters)} style={{ width: 46, borderRadius: 10, border: `1.5px solid ${showFilters ? '#2DC96E' : '#E8EAED'}`, background: showFilters ? '#F0FDF4' : 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -496,20 +496,20 @@ export default function WorkoutPage() {
               </div>
             )}
 
-            <p style={{ fontSize: 12, color: '#9CA3AF' }}>{filtered.length} Übungen</p>
+            <p style={{ fontSize: 12, color: 'var(--text-3)' }}>{filtered.length} Übungen</p>
 
             {filtered.map(ex => {
               const color = MUSCLE_COLOR[ex.muscle] ?? '#2DC96E'
               return (
-                <div key={ex.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #E8EAED', padding: '13px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }} onClick={() => router.push(`/workout/exercise/${ex.id}`)}>
+                <div key={ex.id} style={{ background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', padding: '13px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }} onClick={() => router.push(`/workout/exercise/${ex.id}`)}>
                   <div style={{ width: 40, height: 40, borderRadius: 11, background: `${color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Dumbbell size={18} color={color} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{ex.name}</p>
+                    <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{ex.name}</p>
                     <div style={{ display: 'flex', gap: 7, marginTop: 2 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color }}>{ex.muscle}</span>
-                      <span style={{ fontSize: 11, color: '#9CA3AF' }}>{ex.equipment}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{ex.equipment}</span>
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 5, background: `${DIFF_COLOR[ex.difficulty] ?? '#6B7280'}12`, color: DIFF_COLOR[ex.difficulty] ?? '#6B7280' }}>{ex.difficulty}</span>
                     </div>
                   </div>
@@ -523,8 +523,8 @@ export default function WorkoutPage() {
 
       {/* ── ROUTINE BUILDER ── */}
       {showRoutineBuilder && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'white', overflowY: 'auto', paddingBottom: 40 }}>
-          <div style={{ padding: '52px 16px 16px', borderBottom: '1px solid #E8EAED', position: 'sticky', top: 0, background: 'white', zIndex: 10 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'var(--surface)', overflowY: 'auto', paddingBottom: 40 }}>
+          <div style={{ padding: '52px 16px 16px', borderBottom: '1px solid #E8EAED', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <h2 style={{ fontSize: 20, fontWeight: 800 }}>Neue Routine</h2>
               <button onClick={() => setShowRoutineBuilder(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -536,23 +536,23 @@ export default function WorkoutPage() {
 
           <div style={{ padding: '16px' }}>
             {routineExs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F7F8FA', borderRadius: 14, marginBottom: 16 }}>
+              <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--bg)', borderRadius: 14, marginBottom: 16 }}>
                 <Dumbbell size={36} style={{ color: '#D1D5DB', margin: '0 auto 12px', display: 'block' }} />
-                <p style={{ color: '#9CA3AF', fontSize: 14 }}>Noch keine Übungen</p>
+                <p style={{ color: 'var(--text-3)', fontSize: 14 }}>Noch keine Übungen</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                 {routineExs.map((ex, i) => {
                   const color = MUSCLE_COLOR[ex.muscle] ?? '#2DC96E'
                   return (
-                    <div key={i} style={{ background: 'white', borderRadius: 12, border: '1px solid #E8EAED', padding: '14px 16px' }}>
+                    <div key={i} style={{ background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', padding: '14px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                         <div style={{ width: 34, height: 34, borderRadius: 9, background: `${color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Dumbbell size={15} color={color} />
                         </div>
                         <div style={{ flex: 1 }}>
                           <p style={{ fontWeight: 600, fontSize: 14 }}>{ex.exerciseName}</p>
-                          <p style={{ fontSize: 11, color: '#9CA3AF' }}>{ex.muscle}</p>
+                          <p style={{ fontSize: 11, color: 'var(--text-3)' }}>{ex.muscle}</p>
                         </div>
                         <button onClick={() => setRoutineExs(p => p.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#D1D5DB' }}>
                           <X size={16} />
@@ -565,10 +565,10 @@ export default function WorkoutPage() {
                           { label: 'Pause (s)', field: 'rest' as const, type: 'number', val: String(ex.rest) },
                         ].map(({ label, field, type, val }) => (
                           <div key={field}>
-                            <p style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 4, fontWeight: 600 }}>{label}</p>
+                            <p style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, fontWeight: 600 }}>{label}</p>
                             <input type={type} value={val}
                               onChange={e => setRoutineExs(p => p.map((ex2, idx) => idx !== i ? ex2 : { ...ex2, [field]: type === 'number' ? parseInt(e.target.value) || 0 : e.target.value }))}
-                              style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #E8EAED', textAlign: 'center', fontSize: 14, fontWeight: 700, outline: 'none' }}
+                              style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--border)', textAlign: 'center', fontSize: 14, fontWeight: 700, outline: 'none' }}
                             />
                           </div>
                         ))}
@@ -579,7 +579,7 @@ export default function WorkoutPage() {
               </div>
             )}
 
-            <button onClick={() => setShowExPicker(true)} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1.5px dashed #D1D5DB', background: 'white', cursor: 'pointer', color: '#6B7280', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
+            <button onClick={() => setShowExPicker(true)} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1.5px dashed #D1D5DB', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text-2)', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
               <Plus size={18} color="#2DC96E" /> Übung hinzufügen
             </button>
 
@@ -593,11 +593,11 @@ export default function WorkoutPage() {
       {/* ── EXERCISE PICKER ── */}
       {showExPicker && (
         <div onClick={e => e.target === e.currentTarget && setShowExPicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ width: '100%', background: 'white', borderRadius: '20px 20px 0 0', maxHeight: '85dvh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '100%', background: 'var(--surface)', borderRadius: '20px 20px 0 0', maxHeight: '85dvh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '16px', borderBottom: '1px solid #E8EAED', flexShrink: 0 }}>
               <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E8EAED', margin: '0 auto 14px' }} />
               <div style={{ position: 'relative', marginBottom: 10 }}>
-                <Search size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', pointerEvents: 'none' }} />
+                <Search size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} />
                 <input className="input" placeholder="Übung suchen..." value={exSearch} onChange={e => setExSearch(e.target.value)} style={{ paddingLeft: 38 }} autoFocus />
               </div>
               <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }} className="no-scrollbar">
@@ -617,8 +617,8 @@ export default function WorkoutPage() {
                       <Dumbbell size={15} color={color} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>{ex.name}</p>
-                      <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{ex.muscle} · {ex.equipment}</p>
+                      <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{ex.name}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{ex.muscle} · {ex.equipment}</p>
                     </div>
                     {already ? <Check size={16} color="#15803D" /> : <Plus size={16} color="#2DC96E" />}
                   </button>
@@ -632,7 +632,7 @@ export default function WorkoutPage() {
       {/* ── DELETE ROUTINE SHEET ── */}
       {deleteRtn && (
         <div onClick={e => e.target === e.currentTarget && setDeleteRtn(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ width: '100%', background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px calc(28px + env(safe-area-inset-bottom,0px))' }}>
+          <div style={{ width: '100%', background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '20px 20px calc(28px + env(safe-area-inset-bottom,0px))' }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E8EAED', margin: '0 auto 20px' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -640,7 +640,7 @@ export default function WorkoutPage() {
               </div>
               <div>
                 <p style={{ fontWeight: 700, fontSize: 16 }}>Routine löschen?</p>
-                <p style={{ fontSize: 13, color: '#6B7280' }}>{deleteRtn.name}</p>
+                <p style={{ fontSize: 13, color: 'var(--text-2)' }}>{deleteRtn.name}</p>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
@@ -654,7 +654,7 @@ export default function WorkoutPage() {
       {/* ── DELETE PLAN SHEET ── */}
       {deletePlan && (
         <div onClick={e => e.target === e.currentTarget && setDeletePlan(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ width: '100%', background: 'white', borderRadius: '20px 20px 0 0', padding: '20px 20px calc(28px + env(safe-area-inset-bottom,0px))' }}>
+          <div style={{ width: '100%', background: 'var(--surface)', borderRadius: '20px 20px 0 0', padding: '20px 20px calc(28px + env(safe-area-inset-bottom,0px))' }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: '#E8EAED', margin: '0 auto 20px' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -662,10 +662,10 @@ export default function WorkoutPage() {
               </div>
               <div>
                 <p style={{ fontWeight: 700, fontSize: 16 }}>Plan löschen?</p>
-                <p style={{ fontSize: 13, color: '#6B7280' }}>{deletePlan.name}</p>
+                <p style={{ fontSize: 13, color: 'var(--text-2)' }}>{deletePlan.name}</p>
               </div>
             </div>
-            <p style={{ fontSize: 14, color: '#6B7280', marginBottom: 16 }}>Dieser Plan und alle Trainingstage werden dauerhaft gelöscht.</p>
+            <p style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 16 }}>Dieser Plan und alle Trainingstage werden dauerhaft gelöscht.</p>
             {deleteError && <div style={{ padding: '10px 14px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', marginBottom: 14, display: 'flex', gap: 8 }}>
               <AlertCircle size={15} color="#EF4444" /><p style={{ fontSize: 13, color: '#DC2626' }}>{deleteError}</p>
             </div>}
