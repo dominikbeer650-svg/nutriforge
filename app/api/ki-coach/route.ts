@@ -108,12 +108,21 @@ async function getAvailableModels(apiKey: string): Promise<string[]> {
 
 export async function POST(req: NextRequest) {
     try {
-        const { messages } = await req.json()
+        const { messages, editMode, editPlanName } = await req.json()
         const apiKey = process.env.GEMINI_API_KEY
 
         if (!apiKey) {
             return NextResponse.json({ error: 'GEMINI_API_KEY nicht gesetzt' }, { status: 500 })
         }
+
+        // Use a focused edit prompt when modifying an existing plan
+        const activePrompt = editMode
+            ? `${SYSTEM_PROMPT}
+
+WICHTIG: Du bist im BEARBEITUNGSMODUS für den Plan "${editPlanName ?? 'Trainingsplan'}".
+Der Nutzer möchte Änderungen an diesem Plan. Frage gezielt was geändert werden soll und erstelle dann einen VOLLSTÄNDIGEN überarbeiteten Plan mit allen Tagen und Übungen.
+Stelle maximal 1-2 Fragen bevor du den neuen Plan erstellst.`
+            : SYSTEM_PROMPT
 
         const contents = messages.map((m: { role: string; content: string }) => ({
             role: m.role === 'assistant' ? 'model' : 'user',
@@ -134,7 +143,7 @@ export async function POST(req: NextRequest) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                        system_instruction: { parts: [{ text: activePrompt }] },
                         contents,
                         generationConfig: {
                             temperature: 0.8,

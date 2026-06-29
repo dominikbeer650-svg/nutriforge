@@ -57,13 +57,16 @@ function KICoachInner() {
   const editPlanName = searchParams.get('planName')
   const { user } = useAuthStore()
   const isEditMode = !!editPlanId
+
   const editInitialMessage: Message = {
     role: 'assistant',
     content: `Ich sehe deinen Plan **${editPlanName ?? 'Training'}** — was soll ich daran ändern? Ich kann Übungen austauschen, Tage anpassen, Sätze/Wiederholungen optimieren oder den ganzen Plan neu strukturieren.`,
     chips: ['💪 Mehr Volumen', '📅 Trainingstage anpassen', '🔄 Übungen tauschen', '⚡ Intensität erhöhen', '😌 Weniger Umfang'],
   }
 
-  const [messages, setMessages] = useState<Message[]>([isEditMode ? editInitialMessage : INITIAL_MESSAGE])
+  // Always start with standard message, then switch to edit message once params are available
+  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
+  const [initialized, setInitialized] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null)
@@ -72,9 +75,14 @@ function KICoachInner() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // Once searchParams are available, set the correct initial message
   useEffect(() => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
-  }, [messages, loading, generatedPlan])
+    if (initialized) return
+    setInitialized(true)
+    if (editPlanId && editPlanName) {
+      setMessages([editInitialMessage])
+    }
+  }, [editPlanId, editPlanName])
 
   async function sendMessage(text?: string) {
     const content = (text ?? input).trim()
@@ -92,6 +100,8 @@ function KICoachInner() {
         body: JSON.stringify({
           // Only send role + content to the API, not chips
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          editMode: isEditMode,
+          editPlanName: editPlanName ?? undefined,
         }),
       })
       const data = await res.json()
