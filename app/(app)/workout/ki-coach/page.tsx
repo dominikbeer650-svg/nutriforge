@@ -1,6 +1,6 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, Send, Sparkles, Bot, User, CheckCircle,
   Loader, RefreshCw, AlertCircle, Dumbbell,
@@ -43,9 +43,27 @@ const INITIAL_MESSAGE: Message = {
 }
 
 export default function KICoachPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: 'var(--text-3)' }}>Laden...</p></div>}>
+      <KICoachInner />
+    </Suspense>
+  )
+}
+
+function KICoachInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editPlanId = searchParams.get('editPlanId')
+  const editPlanName = searchParams.get('planName')
   const { user } = useAuthStore()
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
+  const isEditMode = !!editPlanId
+  const editInitialMessage: Message = {
+    role: 'assistant',
+    content: `Ich sehe deinen Plan **${editPlanName ?? 'Training'}** — was soll ich daran ändern? Ich kann Übungen austauschen, Tage anpassen, Sätze/Wiederholungen optimieren oder den ganzen Plan neu strukturieren.`,
+    chips: ['💪 Mehr Volumen', '📅 Trainingstage anpassen', '🔄 Übungen tauschen', '⚡ Intensität erhöhen', '😌 Weniger Umfang'],
+  }
+
+  const [messages, setMessages] = useState<Message[]>([isEditMode ? editInitialMessage : INITIAL_MESSAGE])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null)
@@ -116,29 +134,56 @@ export default function KICoachPage() {
     setSaving(true)
     setSaveError(null)
     try {
-      const { data: plan, error: planError } = await supabase
-        .from('workout_plans')
-        .insert({
-          user_id: user.id,
-          name: generatedPlan.name,
-          description: generatedPlan.description,
-          days_per_week: generatedPlan.days_per_week,
-          difficulty: generatedPlan.difficulty,
-          goal: generatedPlan.goal,
-          duration_weeks: generatedPlan.duration_weeks,
-          is_ai_generated: true,
-        })
-        .select('id')
-        .single()
+      let planId: string
 
-      if (planError) throw new Error(planError.message)
-      if (!plan?.id) throw new Error('Keine Plan-ID')
+      if (isEditMode && editPlanId) {
+        // Update existing plan — delete old days first (cascade deletes exercises)
+        const { error: delErr } = await supabase
+          .from('workout_plan_days')
+          .delete()
+          .eq('plan_id', editPlanId)
+        if (delErr) throw new Error(delErr.message)
+
+        // Update plan metadata
+        const { error: upErr } = await supabase
+          .from('workout_plans')
+          .update({
+            name: generatedPlan.name,
+            description: generatedPlan.description,
+            days_per_week: generatedPlan.days_per_week,
+            difficulty: generatedPlan.difficulty,
+            goal: generatedPlan.goal,
+            duration_weeks: generatedPlan.duration_weeks,
+          })
+          .eq('id', editPlanId)
+        if (upErr) throw new Error(upErr.message)
+        planId = editPlanId
+      } else {
+        // Create new plan
+        const { data: plan, error: planError } = await supabase
+          .from('workout_plans')
+          .insert({
+            user_id: user.id,
+            name: generatedPlan.name,
+            description: generatedPlan.description,
+            days_per_week: generatedPlan.days_per_week,
+            difficulty: generatedPlan.difficulty,
+            goal: generatedPlan.goal,
+            duration_weeks: generatedPlan.duration_weeks,
+            is_ai_generated: true,
+          })
+          .select('id')
+          .single()
+        if (planError) throw new Error(planError.message)
+        if (!plan?.id) throw new Error('Keine Plan-ID')
+        planId = plan.id
+      }
 
       for (const day of generatedPlan.days) {
         const { data: planDay, error: dayError } = await supabase
           .from('workout_plan_days')
           .insert({
-            plan_id: plan.id,
+            plan_id: planId,
             day_number: day.day_number,
             name: day.name,
             focus: day.focus ?? '',
@@ -169,7 +214,7 @@ export default function KICoachPage() {
       }
 
       setSaved(true)
-      setTimeout(() => router.push('/workout'), 1800)
+      setTimeout(() => router.push(isEditMode && editPlanId ? `/workout/plan/${editPlanId}` : '/workout'), 1800)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -204,12 +249,16 @@ export default function KICoachPage() {
           <Sparkles size={20} color="white" />
         </div>
         <div style={{ flex: 1 }}>
-          <p style={{ fontWeight: 800, fontSize: 16, color: '#111827' }}>KI-Coach</p>
-          <p style={{ fontSize: 12, color: '#9CA3AF' }}>Powered by Gemini · Kostenlos</p>
+          <p style={{ fontWeight: 800, fontSize: 16, color: '#111827' }}>
+            {isEditMode ? 'Plan bearbeiten' : 'KI-Coach'}
+          </p>
+          <p style={{ fontSize: 12, color: '#9CA3AF' }}>
+            {isEditMode ? `✏️ ${editPlanName ?? 'Trainingsplan'}` : 'Powered by Gemini · Kostenlos'}
+          </p>
         </div>
         <button
           onClick={() => {
-            setMessages([INITIAL_MESSAGE])
+            setMessages([isEditMode ? editInitialMessage : INITIAL_MESSAGE])
             setGeneratedPlan(null)
             setSaved(false)
             setSaveError(null)
@@ -448,7 +497,7 @@ export default function KICoachPage() {
               >
                 {saving
                   ? <><Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Speichern...</>
-                  : '✅ Plan speichern'}
+                  : isEditMode ? '✅ Plan aktualisieren' : '✅ Plan speichern'}
               </button>
             </div>
           </div>
@@ -458,8 +507,8 @@ export default function KICoachPage() {
         {saved && (
           <div style={{ margin: '4px 0 16px', padding: '28px 24px', borderRadius: 18, background: 'linear-gradient(135deg, #F0FDF4, #DCFCE7)', border: '1px solid #BBF7D0', textAlign: 'center' }}>
             <div style={{ fontSize: 44, marginBottom: 12 }}>🎉</div>
-            <p style={{ fontWeight: 800, fontSize: 19, color: '#111827', marginBottom: 6 }}>Plan gespeichert!</p>
-            <p style={{ fontSize: 14, color: '#4B5563' }}>Du wirst zu deinen Trainingsplänen weitergeleitet...</p>
+            <p style={{ fontWeight: 800, fontSize: 19, color: '#111827', marginBottom: 6 }}>{isEditMode ? 'Plan aktualisiert! 🎉' : 'Plan gespeichert! 🎉'}</p>
+            <p style={{ fontSize: 14, color: '#4B5563' }}>Du wirst weitergeleitet...</p>
           </div>
         )}
 
